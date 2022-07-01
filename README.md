@@ -19,21 +19,21 @@ Support for different job queue systems commonly used on compute clusters.
 You can also write your own custom cluster manager; see the instructions in the [Julia manual](https://docs.julialang.org/en/v1/manual/distributed-computing/#ClusterManagers)
 
 ### Slurm: a simple example
+Arguments to the Slurm `srun(1)` command can be given as keyword arguments (`key = value`) to `addprocs`. 
+The available options can be found [here](https://slurm.schedmd.com/srun.html). 
 
+The keyword argument name and value is translated to a `srun(1)` command line argument as follows:
+1. If the length of the argument name is 1 => "-key value",
+   e.g. t="0:1:0" => "-t 0:1:0"
+2. If the length of the argument name is > 1 => "--key=value"
+   e.g. time="0:1:0" => "--time=0:1:0"
+3. If the value is the empty string, it becomes a flag value,
+   e.g. exclusive="" => "--exclusive"
+4. If the argument key contains "_", they are replaced with "-",
+   e.g. mem_per_cpu=100 => "--mem-per-cpu=100"
 ```julia
 using Distributed, ClusterManagers
 
-# Arguments to the Slurm srun(1) command can be given as keyword
-# arguments to addprocs.  The argument name and value is translated to
-# a srun(1) command line argument as follows:
-# 1) If the length of the argument is 1 => "-arg value",
-#    e.g. t="0:1:0" => "-t 0:1:0"
-# 2) If the length of the argument is > 1 => "--arg=value"
-#    e.g. time="0:1:0" => "--time=0:1:0"
-# 3) If the value is the empty string, it becomes a flag value,
-#    e.g. exclusive="" => "--exclusive"
-# 4) If the argument contains "_", they are replaced with "-",
-#    e.g. mem_per_cpu=100 => "--mem-per-cpu=100"
 addprocs(SlurmManager(2), partition="debug", t="00:5:00")
 
 hosts = []
@@ -49,6 +49,15 @@ end
 for i in workers()
 	rmprocs(i)
 end
+```
+In order to add workers on multiple nodes, pass the number of nodes as argument to `srun` using the key "nodes". The available number of tasks and nodes in the SLURM job can be read from environment variables. The following example adds 160 workers on 10 nodes.
+```julia
+using Distributed, ClusterManagers
+
+# read environment variables set by SLURM
+ntasks = parse(Int64, ENV["SLURM_NTASKS"]) # available number of tasks
+nnodes = parse(Int64, ENV["SLURM_NNODES"]) # available number of nodes
+addprocs_slurm(ntasks; nodes=nnodes)
 ```
 
 ### SGE - a simple interactive example
